@@ -1,9 +1,7 @@
 {
   "functions": [
     "def f2(x): return 1+4/x",
-    "def f3(x,r,df): x['foo'] = 'bar'; return x"
-  ],
-  "constants":[
+    "def f3(x,r,df): x['foo'] = 'bar'; return x",
     "curve_translation = {'USD_OIS':'USD_SOFR','EUR_OIS':'EUR_ESTR'}"
   ],
   "df_transforms": [

@@ -1,7 +1,7 @@
 import json
 import sys
 
-input1 = """
+data = """
 [
   {
     "action": "ADD_IR",
@@ -48,10 +48,12 @@ input1 = """
 ]
 """
 
-def main():
+if len(sys.argv) > 1:
+  with open(sys.argv[1], 'r') as f:
+    data = f.read()
 
-    json1 = json.loads(input1)
-    mapping = analyze(json1, {})
+def main():
+    mapping = analyze(json.loads(data), {})
     fmt = {"mapping":mapping}
     output = json.dumps(fmt,indent=2)
     if sys.getsizeof(output) < 20000:
@@ -60,14 +62,11 @@ def main():
         out.write(output)
 
 
-
 def analyze(node, mapping):
     if type(node) == dict:
         mapping = analyze_obj(node, mapping)
-    elif type(node) == list:
+    if type(node) == list:
         mapping = analyze_arr(node, mapping)
-    else:
-        mapping = analyze_prim(node, mapping)
     return mapping
 
 def analyze_obj(node, mapping):
@@ -87,11 +86,6 @@ def analyze_arr(node, mapping):
             mapping["children"].append(child_mapping)
         elif not any([x == child_mapping for x in mapping["children"]]):
             mapping["children"].append(child_mapping)
-    return mapping
-
-def analyze_prim(node, mapping):
-    if mapping.get("name") in ["instrument_type"]:
-        mapping["value"] = node
     return mapping
 
 if __name__ == '__main__':

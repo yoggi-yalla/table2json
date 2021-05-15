@@ -1,5 +1,7 @@
 # jsonbuilder
-jsonbuilder is a module used for converting .csv data to a structured JSON format.
+This is a module used for converting Excel-like data to a structured JSON format. It makes heavy use of Pandas [DataFrame](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html) objects for data processing, and [asteval](https://newville.github.io/asteval/) for evaluating user input.
+
+The intended audience is someone who receives a wide range of Excel-like input formats and wants to normalize all of them using a common framework.
 
 ## Example usage
 ```Python
@@ -15,8 +17,6 @@ fmt = {
 }
 
 jbTree = jsonbuilder.Tree(fmt, csv)
-
-#print(jbTree.intermediate_dfs)
 
 output_json = jbTree.build().toJson(indent=2)
 ```
@@ -70,7 +70,7 @@ There are many ways of expressing this data in JSON format:
 }
 ````
 
-Even in this simple scenario there are countless ways of converting the .csv into JSON format, some more sensible than others of course. If you have an application that consumes JSON data in a certain format, and you receive data in a flat .csv format, then this tool allows you to easily convert the .csv data to the specific JSON format that can be consumed by your application.
+There are countless ways of converting the .csv into JSON format, some more sensible than others of course. If you have an application that consumes JSON data in a certain format, and you receive data in a flat .csv format, then this tool allows you to easily convert the .csv data to the specific JSON format that can be consumed by your application.
 
 <br>
 
@@ -79,15 +79,15 @@ The mapping is in itself a JSON object, specifying the shape of the desired outp
 
 |Attribute|Description|
 |-------------:|-----------|
-|``"type"``          | Can be ``"object"``, ``"array"``, or ``"primitive"``, defaults to ``"primitive"``|
-|``"name"``      | The `name` of a `value` within an `object` node |
-|``"value"``     | This is typically left blank but can be used for setting a hard-coded value on `primitive` nodes. May contain *any* valid JSON value such as ``"foo"`` or ``0.5`` or ``[true, false, 123]`` or ``{"foo":"bar"}`` etc.|
-|``"column"``         | The column in the DataFrame containing the value to be extracted, e.g. ``"some_column_name"``. This can only be used on primitive nodes. |
-|``"children"``      | An array of all child nodes. Any child of an ``object`` should have a name. Conversely, the children of an ``array`` should not have a name, and any provided name will be ignored. ``primitive`` nodes have no children.|
-|``"filter"``        | Applies a filter to the DataFrame by checking for truth values, for example: <br>``"currency1 == 'EUR' and currency2 == 'SEK'"``. <br>See [df.query](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.query.html) for more informaiton.|
-|``"group_by"``      |  Should contain a column name, e.g. ``"some_other_column_name"``. The jsonbuilder Node will iterate over each unique group in this column and generate one value for each group.|
-|``"iterate"``      |  Similar to ``group_by`` but it is much faster. This is a bool, and if set to ``true`` the jsonbuilder Node will build one value for each *row*. While doing so the jsonbuilder Node drops the DataFrame from memory, so it's not possible to use ``filter``, ``group_by``, or ``iterate`` on any descendant node.|
-|``"transmute"``          | Allows the user to provide an arbitrary expression with ``x``, ``r``, and ``df`` as the variables at their disposal. The evaluated expression is assigned directly to the output value, for example: <br><br>``"x if r['date']>"2020-04-03" else 0"``<br><br>You can read more about the behavior [here](#Transmutes). It is normally a good idea to avoid complex transmutes and instead prepare the data as needed in the [transforms](#Transforms).|
+|``type``          | Can be ``"object"``, ``"array"``, or ``"primitive"``, defaults to ``"primitive"``|
+|``name``      | This is used to specify the name of a value within an object|
+|``value``     | This is typically left blank but can be used for setting a hard-coded value on `primitive` nodes. May contain *any* valid JSON value such as ``"foo"`` or ``0.5`` or ``[true, false, 123]`` or ``{"foo":"bar"}`` etc.|
+|``column``         | The column in the DataFrame containing the value to be extracted, e.g. ``"some_column_name"``. This can only be used on primitive nodes. |
+|``children``      | An array of all child nodes. Any child of an ``object`` should have a name. Conversely, the children of an ``array`` should not have a name, and any provided name will be ignored. ``primitive`` nodes have no children.|
+|``filter``        | Applies a filter to the DataFrame by checking for truth values, for example: <br>``"currency1 == 'EUR' and currency2 == 'SEK'"``. <br>See [df.query](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.query.html) for more informaiton.|
+|``group_by``      |  Should contain a column name, e.g. ``"some_other_column_name"``. The jsonbuilder Node will iterate over each unique group in this column and generate one value for each group.|
+|``iterate``      |  Similar to ``group_by`` but it is much faster. This is a bool, and if set to ``true`` the jsonbuilder Node will build one value for each *row*. While doing so the jsonbuilder Node drops the DataFrame from memory, so it's not possible to use ``filter``, ``group_by``, or ``iterate`` on any descendant node.|
+|``transmute``          | Allows the user to provide an arbitrary expression with ``x``, ``r``, and ``df`` as the variables at their disposal. The evaluated expression is assigned directly to the output value, for example: <br><br>``"x if r['date']>"2020-04-03" else 0"``<br><br>You can read more about the behavior [here](#Transmutes). It is normally a good idea to avoid complex transmutes and instead prepare the data as needed in the [transforms](#Transforms).|
 
 <br>
 
@@ -170,7 +170,7 @@ transforms:[
 ]
 ```
 
-For simple operations it is often more convenient to write an expression directly in the string, but for large/complex operations this functionality is essential.
+For simple operations it is often more convenient to write an expression directly in the ``"transmute"``-string, but for large/complex operations this functionality is essential.
 
 <br>
 
@@ -216,7 +216,7 @@ Transmutes allow the user to manipulate the value generated by one jsonbuilder N
 
 This is slightly simplified, step 2 also involves iterating over rows or groups of the DataFrame. What that means in practice is that in each iteration, only one row or group of the dataframe will be passed down to the child node.
 
-The transmute is essentially one or more expressions (separated by ";") with three parameters: `x`, `r`, and `df`. Within the expression, `x` represents the *value* stored on this node, `r` represents the *row* currently being processed, and `df` represents the *group* (i.e. DataFrame) currently being processed. When iterating over groups, `r` represents the top row of the current group, but when iterating over rows there is no DataFrame available, so `df` is equal to `None`. 
+The transmute is an expression with three special variables: `x`, `r`, and `df`. Within the expression, `x` represents the value stored on this node, `r` represents the row currently being processed, and `df` represents the group (i.e. DataFrame) currently being processed. When iterating over groups, `r` represents the top row of the current group, but when iterating over rows there is no DataFrame available, so `df` is equal to `None`. 
 
 Here are a few examples of how it may be used:
 
@@ -231,16 +231,8 @@ Here are a few examples of how it may be used:
    # This is significantly faster than iterating over each row
 3. "transmute": "df['fixings'].tolist()" 
 
-   # Add a new key:value pair to the object being built
-   # This will only work on an object node, here x is a python dict
-4. "transmute": "x['foo'] = 'bar';x"
-
-   # Append a new value to the array being built
-   # This will only work on an array node, here x is a python list
-5. "transmute": "x.append(5);x"
-
    # x, r, and df can be passed to your own functions like this
-6. "transmute": "f1(x,r,df)"
+4. "transmute": "f1(x,r,df)"
 ```
 
 Keep in mind that `x` will be of different type depending on whether the transmute is specified on a `primitive-`, `object-`, or `array` node. Whatever the transmute evaluates to will be the final value of the node. 

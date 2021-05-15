@@ -1,12 +1,10 @@
 {
-  "constants":[
-    "id_translation = {'GBP_SONIA':'GBP_OIS', 'EUR_\u20ACSTR': 'EUR_ESTR'}",
-    "base_curves = {'GBP':'GBP_OIS','USD':'USD_SOFR'}"
-  ],
   "functions":[
     "def f1(x,r,df): x['foo'] = 'bar'; return x",
     "def f2(x,r,df): x.append(1); return x",
-    "def f3(df, col): df[col] = df[col].str[:1]; return df"
+    "def f3(df, col): df[col] = df[col].str[:1]; return df",
+    "id_translation = {'GBP_SONIA':'GBP_OIS', 'EUR_\u20ACSTR': 'EUR_ESTR'}",
+    "base_curves = {'GBP':'GBP_OIS','USD':'USD_SOFR'}"
   ],
   "df_transforms":[
     "translate(df['identifier'], id_translation)",

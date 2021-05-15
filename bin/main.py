@@ -11,14 +11,13 @@ parser.add_argument("-t", "--table")
 parser.add_argument("-o", "--output")
 parser.add_argument("-d", "--date")
 parser.add_argument("-i", "--inspect_row", type=int)
-parser.add_argument("-n", "--native_eval", action="store_true")
 parser.add_argument("-p", "--profiler", action="store_true")
 parser.add_argument("-v", "--verbose", action="store_true")
 args = parser.parse_args()
 
 """
 To run this script you must first install the project. 
-Go to the project root directory and enter:
+Run the following command from the project root directory:
 pip install -e .
 
 You can then run the main function in this tool as:
@@ -46,7 +45,6 @@ def main():
         args.table,
         date=args.date,
         inspect_row=args.inspect_row,
-        use_native_eval=args.native_eval,
     )
 
     if args.verbose:
@@ -59,14 +57,14 @@ def main():
         with open(args.output, "w") as f:
             f.write(output_json)
 
+    logging.info("Process completed")
+    logging.info("Elapsed time: " + str(time.process_time()) + " seconds")
+
     if args.verbose:
         if len(output_json) > 100000:
             print("Output JSON is too large to print...")
         else:
             print(output_json)
-
-    logging.info("Process completed")
-    logging.info("Elapsed time: " + str(time.process_time()) + " seconds")
 
 
 if __name__ == "__main__":

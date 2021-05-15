@@ -7,43 +7,25 @@ from dateutil.relativedelta import relativedelta
 import pandas
 import rapidjson
 
-from jsonbuilder.util import std_funcs
-
-native_eval = 0
+import jsonbuilder.util
 
 
 class Tree:
-    def __init__(self, fmt, table, date=None, inspect_row=None, use_native_eval=False):
+    def __init__(self, fmt, table, date=None, inspect_row=None):
         logging.info("Initializing Tree")
         mapping = fmt.get("mapping", {})
-        constants = fmt.get("constants", [])
         functions = fmt.get("functions", [])
         df_transforms = fmt.get("df_transforms", [])
         raw_header = fmt.get("raw_header", False)
         table_kwargs = fmt.get("table_kwargs", {})
 
-        if use_native_eval:
-            # Only use this when 'fmt' comes from a trusted source
-            # No attempts have been made to sanitize input or similar
-            global native_eval, today
-            [exec(f, globals()) for f in std_funcs]
-            native_eval = 1
-            today = pandas.Timestamp(date).date()
-
         self.eval = Interpreter()
+        self.load_symtable(functions, date)
+
         self.root = Tree.parse_mapping(self, mapping, 1)
         self.df = Tree.load_table(table, raw_header, **table_kwargs)
         self.intermediate_dfs = []
 
-        [self.eval(f) for f in std_funcs]
-        self.eval.symtable["today"] = pandas.Timestamp(date).date()
-        self.eval.symtable["re"] = re
-        self.eval.symtable["pandas"] = pandas
-        self.eval.symtable["datetime"] = datetime
-        self.eval.symtable["relativedelta"] = relativedelta
-
-        self.load_constants(constants)
-        self.load_functions(functions)
         self.transform_table(df_transforms, inspect_row)
 
     @staticmethod
@@ -97,34 +79,24 @@ class Tree:
                     guess = s
         return guess
 
-    def load_functions(self, functions):
+    def load_symtable(self, functions, date):
         logging.info("Loading functions")
-        if native_eval:
-            for func in functions:
-                exec(func, globals())
-        else:
-            for func in functions:
-                try:
-                    assert func.lstrip()[:4] == "def "
-                    self.eval(func, show_errors=False)
-                except Exception:
-                    logging.error("Failed to load functions")
-                    raise
-        return self
 
-    def load_constants(self, constants):
-        logging.info("Loading constants")
-        if native_eval:
-            for const in constants:
-                exec(const, globals())
-        else:
-            for const in constants:
-                try:
-                    assert len(const.split("=")) == 2
-                    self.eval(const, show_errors=False)
-                except Exception:
-                    logging.error("Failed to load constants")
-                    raise
+        self.eval.symtable["today"] = pandas.Timestamp(date).date()
+        self.eval.symtable['translate'] = jsonbuilder.util.translate
+        self.eval.symtable['date'] = jsonbuilder.util.date
+        self.eval.symtable['delta'] = jsonbuilder.util.delta
+        self.eval.symtable["re"] = re
+        self.eval.symtable["pandas"] = pandas
+        self.eval.symtable["datetime"] = datetime
+        self.eval.symtable["relativedelta"] = relativedelta
+
+        for func in functions:
+            try:
+                self.eval(func, show_errors=False)
+            except Exception:
+                logging.error("Failed to load functions")
+                raise
         return self
 
     def transform_table(self, df_transforms, inspect_row):
@@ -146,16 +118,12 @@ class Tree:
         self.intermediate_dfs.append(intermediate_df)
 
     def _apply_transform(self, transform):
-        if native_eval:
-            f = eval("lambda df:" + transform)
-            out = f(self.df)
-        else:
-            self.eval.symtable["df"] = self.df
-            parsed_transform = self.eval.parse(transform)
-            out = self.eval.run(parsed_transform, with_raise=False)
-            if self.eval.error:
-                logging.error(f"Failed to apply transform: {transform}")
-                raise Exception(self.eval.error[0].msg)
+        self.eval.symtable["df"] = self.df
+        parsed_transform = self.eval.parse(transform)
+        out = self.eval.run(parsed_transform, with_raise=False)
+        if self.eval.error:
+            logging.error(f"Failed to apply transform: {transform}")
+            raise Exception(self.eval.error[0].msg)
         if isinstance(out, pandas.DataFrame):
             self.df = out
         elif isinstance(out, pandas.Series):
@@ -163,7 +131,7 @@ class Tree:
         else:
             logging.error("Unexpected error while pre-processing DataFrame")
             msg = (
-                f"\n\nInvalid return type from df_transform: {transform}\n"
+                f"Invalid return type from df_transform: {transform}\n"
                 f"With return type: {type(out)}\n"
                 f"Should be one of: 'pandas.Series' (column) or 'pandas.DataFrame' (table)"
             )
@@ -205,15 +173,12 @@ class Node:
         self.children = []
 
         if self.transmute:
-            if native_eval:
-                self.transexpr = eval("lambda x,r,df:(" + self.transmute + ",)[-1]")
-            else:
-                self.transexpr = self.tree.eval.parse(self.transmute)
-                if self.tree.eval.error:
-                    logging.error(
-                        f"Unexpected error while loading transmute: {self.transmute}"
-                    )
-                    raise Exception(self.tree.eval.error_msg)
+            self.transexpr = self.tree.eval.parse(self.transmute)
+            if self.tree.eval.error:
+                logging.error(
+                    f"Unexpected error while loading transmute: {self.transmute}"
+                )
+                raise Exception(self.tree.eval.error_msg)
 
     def build(self):
         self._filter()
@@ -227,8 +192,7 @@ class Node:
     def _filter(self):
         if self.filter:
             try:
-                ld = {"today": self.tree.eval.symtable["today"]}
-                self.df = self.df.query(self.filter, local_dict=ld)
+                self.df = self.df.query(self.filter, local_dict=self.tree.eval.symtable)
             except Exception:
                 logging.error(f"Failed to apply filter: {self.filter}")
                 raise
@@ -239,24 +203,15 @@ class Node:
 
     def _transmute(self):
         if self.transmute:
-            if native_eval:
-                try:
-                    self.value = self.transexpr(self.value, self.row, self.df)
-                except Exception:
-                    logging.error(
-                        f"Unexpected error while transmuting {self.name} on row: {getattr(self.row, 'Index')}"
-                    )
-                    raise
-            else:
-                self.tree.eval.symtable["x"] = self.value
-                self.tree.eval.symtable["r"] = self.row
-                self.tree.eval.symtable["df"] = self.df
-                self.value = self.tree.eval.run(self.transexpr, with_raise=False)
-                if self.tree.eval.error:
-                    logging.error(
-                        f"Unexpected error while transmuting {self.name} on row: {getattr(self.row, 'Index')}"
-                    )
-                    raise Exception(self.tree.eval.error[0].msg)
+            self.tree.eval.symtable["x"] = self.value
+            self.tree.eval.symtable["r"] = self.row
+            self.tree.eval.symtable["df"] = self.df
+            self.value = self.tree.eval.run(self.transexpr, with_raise=False)
+            if self.tree.eval.error:
+                logging.error(
+                    f"Unexpected error while transmuting {self.name} on row: {getattr(self.row, 'Index')}"
+                )
+                raise Exception(self.tree.eval.error[0].msg)
 
     def _iterate(self):
         if self.group_by:

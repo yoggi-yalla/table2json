@@ -100,17 +100,3 @@ def test_full_csv_excel():
     with open(test_data_folder + 'formatfull.json', 'r') as f:
         output2 = Tree(rapidjson.load(f), test_data_folder + 'testfull.xlsx', date='2020-02-02').build().toJson(indent=2)
     assert output1 == output2 
-
-def test_full_csv_eval():
-    with open(test_data_folder + 'formatfull.json', 'r') as f:
-        output1 = Tree(rapidjson.load(f), test_data_folder + 'testfull.csv', date='2020-02-02').build().toJson(indent=2)
-    with open(test_data_folder + 'formatfull.json', 'r') as f:
-        output2 = Tree(rapidjson.load(f), test_data_folder + 'testfull.csv', date='2020-02-02', use_native_eval=True).build().toJson(indent=2)
-    assert output1 == output2 
-
-def test_full_excel_eval():
-    with open(test_data_folder + 'formatfull.json', 'r') as f:
-        output1 = Tree(rapidjson.load(f), test_data_folder + 'testfull.xlsx', date='2020-02-02').build().toJson(indent=2)
-    with open(test_data_folder + 'formatfull.json', 'r') as f:
-        output2 = Tree(rapidjson.load(f), test_data_folder + 'testfull.xlsx', date='2020-02-02', use_native_eval=True).build().toJson(indent=2)
-    assert output1 == output2 
