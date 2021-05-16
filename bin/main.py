@@ -34,6 +34,7 @@ def main(
     inspect_row=None,
     verbose=False,
 ):
+    start = time.time()
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(message)s",
@@ -62,7 +63,7 @@ def main(
             f.write(output_json)
 
     logging.info("Process completed")
-    logging.info("Elapsed time: " + str(time.process_time()) + " seconds")
+    logging.info("Elapsed time: " + str(round(time.time() - start, 3)) + " seconds")
 
     if verbose:
         for df in jbTree.intermediate_dfs:

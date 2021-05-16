@@ -12,17 +12,18 @@ import jsonbuilder.util
 
 class Tree:
     """
-    This class is instantiated using a 'format' and an Excel-like file, and
-    it is meant to provide the public interface to the user.
+    This class serves as the public API for the module.
 
     Example usage:
     t = Tree(fmt, csv_file)
-    print(t.intermediate_dfs) # an intermediate df is saved after each df_transform
-    output = t.build().toJson(indent=2)
+    output_json = t.build().toJson(indent=2)
 
     The class is also responsible for:
         1. Providing the 'eval' functionality used throughout the build
         2. Applying column-wise (or table-wise) transformations of the data
+
+    A sample of what the dataframe looked like after each df_transform is
+    stored in t.intermediate_dfs
     """
 
     def __init__(self, fmt, table, date=None, inspect_row=None):
@@ -173,10 +174,10 @@ class Tree:
 
 class Node:
     """
-    This class and its subclasses define how one 'mapping' and one DataFrame 
+    This class and its subclasses define how one mapping and one DataFrame 
     are converted into one JSON output.
 
-    Each object in the fmt 'mapping' represents one Node. This class is never
+    Each object in the fmt mapping represents one Node. This class is never
     instantiated directly, instead the subclasses JsonArray, JsonObject, and 
     JsonPrimitive are used.
     """
